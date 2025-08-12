@@ -101,7 +101,7 @@ jobs:
       - name: Coverage summary
         shell: bash
         run: |
-          go tool cover -func=coverage.out | tee coverage.out
+          go tool cover -func=coverage.out | tee coverage.txt
           total=$(grep -E "^total:" coverage.txt | awk '{print $3}')
           echo "Total coverage: $total"
 
