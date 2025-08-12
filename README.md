@@ -3,7 +3,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/go-mizu/xsql.svg)](https://pkg.go.dev/github.com/go-mizu/xsql)
 [![Go Report Card](https://goreportcard.com/badge/github.com/go-mizu/xsql)](https://goreportcard.com/report/github.com/go-mizu/xsql)
 [![Tests](https://github.com/go-mizu/xsql/actions/workflows/test.yml/badge.svg)](https://github.com/go-mizu/xsql/actions/workflows/test.yml)
-[![Codecov](https://codecov.io/gh/go-mizu/xsql/branch/main/graph/badge.svg)](https://codecov.io/gh/go-mizu/xsql)
+[![Codecov](https://codecov.io/gh/go-mizu/xsql/graph/badge.svg?token=JJT4LA32LV)](https://codecov.io/gh/go-mizu/xsql)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 xsql is a small, stdlib-style layer over `database/sql` that eliminates
