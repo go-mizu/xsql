@@ -33,7 +33,10 @@ jobs:
       - name: Cache Go build cache (extra)
         uses: actions/cache@v4
         with:
-          path: ~/.cache/go-build
+          path: |
+            ~/.cache/go-build
+            ~/Library/Caches/go-build
+            ~\AppData\Local\go-build
           key: ${{ runner.os }}-gobuild-${{ hashFiles('**/go.sum') }}
           restore-keys: ${{ runner.os }}-gobuild-
 
@@ -50,7 +53,7 @@ jobs:
       - name: govulncheck
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
+          govulncheck -mode=source ./...
 
   test:
     name: Test (Go ${{ matrix.go }} • ${{ matrix.os }})
@@ -73,7 +76,10 @@ jobs:
       - name: Cache Go build cache (extra)
         uses: actions/cache@v4
         with:
-          path: ~/.cache/go-build
+          path: |
+            ~/.cache/go-build
+            ~/Library/Caches/go-build
+            ~\AppData\Local\go-build
           key: ${{ runner.os }}-gobuild-${{ matrix.go }}-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-gobuild-${{ matrix.go }}-
@@ -99,32 +105,11 @@ jobs:
           total=$(grep -E "^total:" coverage.txt | awk '{print $3}')
           echo "Total coverage: $total"
 
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
+      - name: Upload coverage reports to Codecov
+        if: matrix.os == 'ubuntu-latest' && (github.event_name == 'push' || github.event.pull_request.head.repo.fork == false)
+        uses: codecov/codecov-action@v5
         with:
-          name: coverage-${{ matrix.os }}-${{ matrix.go }}
-          path: |
-            coverage.out
-            coverage.txt
-
-  coverage-aggregate:
-    name: Coverage (aggregate)
-    needs: test
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download Linux latest-Go coverage
-        uses: actions/download-artifact@v4
-        with:
-          pattern: coverage-ubuntu-latest-1.24.x
-          merge-multiple: true
-
-      - name: Show final coverage
-        run: |
-          if [ -f coverage.out ]; then
-            go tool cover -func=coverage.out
-          else
-            echo "No coverage.out found (matrix may have failed)."
-          fi
+          token: ${{ secrets.CODECOV_TOKEN }} # omit for public repos with tokenless upload
+          files: coverage.out
+          slug: go-mizu/xsql
+          fail_ci_if_error: true

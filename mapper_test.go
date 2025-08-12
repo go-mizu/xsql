@@ -91,7 +91,7 @@ func TestBuildStructIndex_InlineAndAnonymous(t *testing.T) {
 		Skip     string `db:"-"`
 		unexp    int    // unexported non-anonymous → ignored
 	}
-	
+
 	// Touch the unexported field so linters consider it used.
 	_ = Outer{unexp: 1}
 
