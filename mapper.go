@@ -254,7 +254,9 @@ func buildStructIndex(rt reflect.Type) fieldIndex {
 				continue
 			}
 			ft := sf.Type
-			path := append(append([]int(nil), base...), i)
+			path := make([]int, len(base)+1)
+			copy(path, base)
+			path[len(base)] = i
 
 			if inline || (sf.Anonymous && (forceInline || tag == "")) {
 				if isStruct(ft) || (ft.Kind() == reflect.Ptr && isStruct(ft.Elem())) {
