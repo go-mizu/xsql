@@ -1,0 +1,26 @@
+# .goreleaser.yaml
+version: 2
+
+project_name: xsql
+
+# Library-only: no binaries to build.
+builds:
+  - skip: true
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+release:
+  prerelease: auto
+  draft: false
+
+changelog:
+  use: git
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"

@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CGO_ENABLED: "0"
+  GOFLAGS: "-mod=readonly"
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+          cache: true
+
+      - name: Cache Go build cache (extra)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/go-build
+          key: ${{ runner.os }}-gobuild-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-gobuild-
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m --out-format=github-actions
+          only-new-issues: true
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  test:
+    name: Test (Go ${{ matrix.go }} • ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["1.24.x", "1.23.x", "1.22.x", "1.21.x"]
+        os: [ubuntu-latest, macos-15, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go ${{ matrix.go }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          check-latest: true
+          cache: true
+
+      - name: Cache Go build cache (extra)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/go-build
+          key: ${{ runner.os }}-gobuild-${{ matrix.go }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-gobuild-${{ matrix.go }}-
+            ${{ runner.os }}-gobuild-
+
+      - name: Verify build
+        run: go build ./...
+
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
+
+      - name: Run tests (shuffle, coverage)
+        shell: bash
+        run: |
+          gotestsum --format=short-verbose -- \
+            -covermode=atomic -coverpkg=./... \
+            -coverprofile=coverage.out ./...
+
+      - name: Coverage summary
+        shell: bash
+        run: |
+          go tool cover -func=coverage.out | tee coverage.txt
+          total=$(grep -E "^total:" coverage.txt | awk '{print $3}')
+          echo "Total coverage: $total"
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.os }}-${{ matrix.go }}
+          path: |
+            coverage.out
+            coverage.txt
+
+  coverage-aggregate:
+    name: Coverage (aggregate)
+    needs: test
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Linux latest-Go coverage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-ubuntu-latest-1.24.x
+          merge-multiple: true
+
+      - name: Show final coverage
+        run: |
+          if [ -f coverage.out ]; then
+            go tool cover -func=coverage.out
+          else
+            echo "No coverage.out found (matrix may have failed)."
+          fi

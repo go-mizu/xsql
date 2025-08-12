@@ -1,0 +1,104 @@
+# ------------------------------
+# Go build outputs
+# ------------------------------
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace/build cache (optional if using module-aware mode)
+# go env GOCACHE
+**/pkg/
+**/bin/
+
+# Coverage output
+*.cover
+*.coverprofile
+*.cov
+*.cov.out
+*.lcov
+coverage.txt
+coverage.out
+
+# ------------------------------
+# Go tools
+# ------------------------------
+# GoLand / JetBrains
+.idea/
+# VSCode
+.vscode/
+*.code-workspace
+
+# ------------------------------
+# macOS system files
+# ------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+# Thumbnails
+._*
+# Files that might appear on network shares
+.DS_Store?
+.fseventsd
+.apdisk
+
+# ------------------------------
+# Logs and temp files
+# ------------------------------
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# ------------------------------
+# Dependency vendoring
+# ------------------------------
+vendor/
+# If using vendoring but want to keep go.mod/go.sum, remove vendor/ above
+
+# ------------------------------
+# Test data / fixtures (optional)
+# ------------------------------
+*.testdata
+testdata/
+*.snap
+
+# ------------------------------
+# OS-specific trash
+# ------------------------------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ------------------------------
+# Build artifacts (local tooling)
+# ------------------------------
+dist/
+build/
+cmd/*/bin/
+tools/bin/
+
+# ------------------------------
+# Local env/config overrides
+# ------------------------------
+.env
+.env.*
+*.local
+
+# ------------------------------
+# Module proxy cache (if not using globally)
+# ------------------------------
+.gocache/
+gomodcache/
+
+coverage.html
+coverage.out
