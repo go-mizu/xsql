@@ -34,8 +34,11 @@ Key capabilities include:
 - Built-in plan caching for performance, initialized lazily and safe for
   concurrent access.
 - Fully compatible with native SQL syntax, no query builders or DSLs.
-- Small, focused API: `Query`, `Get`, and `Exec` cover the majority of use
-  cases.
+- **First-class support for named parameters** (`:name`) with safe slice/array
+  expansion and placeholder rewriting for multiple SQL dialects
+  (PostgreSQL, MySQL, SQLite, SQL Server, Oracle, DuckDB, ClickHouse, etc.).
+- Small, focused API: `Query`, `Get`, `Exec`, `NamedQuery`, and `NamedExec` cover
+  the majority of use cases.
 
 ## Why xsql
 
@@ -89,7 +92,7 @@ talk to databases. Instead, it gives you minimal, type-safe helpers so you can:
   they expect.
 
 The result is code that looks clean, compiles with type safety, and performs
-just as well as hand-written scanning- while remaining transparent and
+just as well as handwritten scanning - while remaining transparent and
 debuggable.
 
 ## Installation
@@ -171,6 +174,57 @@ if u != nil {
 }
 ```
 
+### Named Parameters Example
+
+You can use named parameters (`:name`) with `NamedQuery` and `NamedExec` for safer, clearer queries.
+Instead of passing a generic `map[string]any`, define a struct with `db` tags for each parameter:
+
+```go
+type UserFilter struct {
+    Status string  `db:"status"`
+    IDs    []int64 `db:"ids"`
+}
+
+filter := UserFilter{
+    Status: "active",
+    IDs:    []int64{1, 2, 3},
+}
+
+// Automatically picks correct placeholder style for your driver
+ph := xsql.PlaceholderFor("pgx") // → xsql.PlaceholderDollar
+
+users, err := xsql.NamedQuery[User](ctx, db, ph,
+    `SELECT id, email FROM users WHERE status = :status AND id IN (:ids)`,
+    filter)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+`NamedExec` works the same way:
+
+```go
+type UpdateStatus struct {
+    Status string `db:"status"`
+    IDs    []int  `db:"ids"`
+}
+
+upd := UpdateStatus{
+    Status: "archived",
+    IDs:    []int{5, 6},
+}
+
+ph := xsql.PlaceholderFor("sqlserver") // → xsql.PlaceholderAtP
+
+_, err = xsql.NamedExec(ctx, db, ph,
+    `UPDATE users SET status = :status WHERE id IN (:ids)`,
+    upd)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+
 ## Usage Guide
 
 xsql keeps the surface small so you can learn it in minutes. There are three
@@ -187,16 +241,16 @@ argument can be a `*sql.DB`, `*sql.Tx`, or anything that implements
 
 ```go
 type Product struct {
-ID    int64   `db:"id"`
-Name  string  `db:"name"`
-Price float64 `db:"price"`
+    ID    int64   `db:"id"`
+    Name  string  `db:"name"`
+    Price float64 `db:"price"`
 }
 
 ctx := context.Background()
 products, err := xsql.Query[Product](ctx, db,
-`SELECT id, name, price FROM products WHERE price > ?`, 10.0)
+    `SELECT id, name, price FROM products WHERE price > ?`, 10.0)
 if err != nil {
-log.Fatal(err)
+    log.Fatal(err)
 }
 fmt.Println(products)
 ```
@@ -212,13 +266,13 @@ expect at most one row.
 ```go
 ctx := context.Background()
 price, err := xsql.Get[float64](ctx, db,
-`SELECT price FROM products WHERE id = ?`, 42)
+    `SELECT price FROM products WHERE id = ?`, 42)
 if err != nil {
-if errors.Is(err, sql.ErrNoRows) {
-fmt.Println("No product found")
-} else {
-log.Fatal(err)
-}
+    if errors.Is(err, sql.ErrNoRows) {
+        fmt.Println("No product found")
+    } else {
+        log.Fatal(err)
+    }
 }
 fmt.Println("Price:", price)
 ```
@@ -234,13 +288,84 @@ implements `ExecContext`.
 ```go
 ctx := context.Background()
 res, err := xsql.Exec(ctx, db,
-`UPDATE products SET price = price - 1.1 WHERE category_id = ?`, 5)
+    `UPDATE products SET price = price - 1.1 WHERE category_id = ?`, 5)
 if err != nil {
-log.Fatal(err)
+    log.Fatal(err)
 }
 affected, _ := res.RowsAffected()
 fmt.Println("Updated rows:", affected)
 ```
+
+### NamedQuery
+
+`NamedQuery[T any](ctx context.Context, db Querier, placeholder Placeholder, query string, params any) ([]T, error)`
+
+Like `Query`, but supports **named parameters** (`:name`) in the SQL string.
+The `params` argument can be a struct (fields tagged with `db:"name"`) or a `map[string]any`.
+Slices and arrays (except `[]byte`) are expanded automatically for `IN` clauses.
+The `placeholder` argument specifies the style for your database — use
+`PlaceholderFor(driverName)` to detect it.
+
+```go
+type ProductFilter struct {
+    MinPrice float64 `db:"min_price"`
+    IDs      []int   `db:"ids"`
+}
+
+filter := ProductFilter{
+    MinPrice: 10.0,
+    IDs:      []int{1, 2, 3},
+}
+
+ph := xsql.PlaceholderFor("pgx") // → xsql.PlaceholderDollar
+
+ctx := context.Background()
+products, err := xsql.NamedQuery[Product](ctx, db, ph,
+    `SELECT id, name, price
+     FROM products
+     WHERE price >= :min_price
+       AND id IN (:ids)`,
+    filter)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(products)
+```
+
+### NamedExec
+
+`NamedExec(ctx context.Context, db Execer, placeholder Placeholder, query string, params any) (sql.Result, error)`
+
+Executes a SQL statement with **named parameters**, without returning rows — useful for `INSERT`, `UPDATE`, or `DELETE`.
+`params` follows the same rules as `NamedQuery`.
+
+```go
+type UpdateStatus struct {
+    Status string `db:"status"`
+    IDs    []int  `db:"ids"`
+}
+
+upd := UpdateStatus{
+    Status: "archived",
+    IDs:    []int{5, 6},
+}
+
+ph := xsql.PlaceholderFor("sqlserver") // → xsql.PlaceholderAtP
+
+ctx := context.Background()
+res, err := xsql.NamedExec(ctx, db, ph,
+    `UPDATE products
+     SET status = :status
+     WHERE id IN (:ids)`,
+    upd)
+if err != nil {
+    log.Fatal(err)
+}
+
+affected, _ := res.RowsAffected()
+fmt.Println("Updated rows:", affected)
+```
+
 
 ## Advanced Usage
 
@@ -398,29 +523,8 @@ that documentation and implementation stay in sync.
 To run tests locally:
 
 ```bash
-go test ./...
+go test ./... -v
 ```
-
-Some tests use SQLite in-memory mode (`modernc.org/sqlite`) for simplicity. No
-additional database setup is required to run them.
-
-## Project Structure
-
-The repository is organized to keep the codebase simple and easy to navigate:
-
-```
-xsql/
-  ├── doc.go         -  package overview and documentation
-  ├── xsql.go        -  core interfaces and shared definitions
-  ├── mapper.go      -  reflection-based mapping and caching
-  ├── query.go       -  typed query helpers
-  ├── get.go         -  single-row query helpers
-  ├── exec.go        -  statement execution helper
-  ├── *_test.go      -  example and unit tests
-```
-
-The package is designed for direct import without requiring code generation or
-additional tooling.
 
 ## License
 
